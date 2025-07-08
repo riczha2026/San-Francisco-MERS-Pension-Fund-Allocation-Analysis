@@ -3,14 +3,17 @@
 ## Overview
 
 
-This project analyzes a hypothetical asset allocation strategy of San Francisco’s **Municipal Employees’ Retirement System (MERS)**, particularly in light of unusual losses in **2022** and elevated volatility from **2023–2024**. The MERS fund, currently valued at **$525 million**, follows a traditional **60/40 portfolio** (60% U.S. large-cap equities / 40% fixed income).
+This project, completed as part of my **Financial Market Risk and Modeling course at UC Santa Barbara**, analyzes a hypothetical asset allocation strategy for San Francisco’s **Municipal Employees’ Retirement System (MERS)**. The analysis draws from **historical data provided by the course professor** and uses simulation outputs from the **AIRG Economic Scenario Generator (ESG)**.
 
-To strengthen the fund’s resilience, our client is considering a **$175 million top-up** using **COVID relief funds**. This top-up increases the total fund value to **$700 million** and opens the door to more conservative allocation strategies that reduce insolvency risk while optimizing long-term performance.
+The study is motivated by **unusual losses in 2022** and **elevated volatility from 2023–2024**, which raised concerns about the fund’s long-term solvency. At the time of analysis, the MERS fund is assumed to be valued at **$525 million**, following a traditional **60/40 portfolio** (60% U.S. large-cap equities / 40% fixed income).
 
-We use the **AIRG Economic Scenario Generator (ESG)** to test portfolio allocations over a 30-year horizon, focusing on:
-- Insolvency risk
-- Expected surplus
-- Sharpe ratio (risk-adjusted returns)
+To enhance the fund’s resilience, our client is considering a **$175 million top-up using COVID relief funds**, bringing the total fund value to **$700 million**. This addition allows for more conservative investment strategies that aim to minimize **insolvency risk** while maintaining strong, risk-adjusted performance.
+
+Using the AIRG ESG, we test various allocation strategies over a **30-year horizon**, evaluating them on:
+- **Insolvency risk**
+- **Expected surplus**
+- **Sharpe ratio** (risk-adjusted return)
+
 
 ---
 
