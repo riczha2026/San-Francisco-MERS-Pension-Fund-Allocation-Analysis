@@ -1,0 +1,433 @@
+---
+output: pdf_document
+header-includes:
+   - \usepackage{titling}
+   - \usepackage{lipsum}  # Optional, helps layout
+---
+
+\begin{titlepage}
+\centering
+\vspace*{7cm}
+
+{\Huge \textbf{San Francisco's MERS Investment Strategy} \par}
+\vspace{0.25cm}
+{\LARGE PSTAT 177, Spring 2025 \par}
+\vspace{0.25cm}
+{\Large Richard Zhang \par}
+\vspace{0.25cm}
+
+\vfill
+\end{titlepage}
+
+\newpage
+
+```{r setup, include=FALSE}
+library(knitr)
+library(testthat)
+library(tidyverse)
+library(patchwork)
+library(broom)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
+
+# Exuctuve Summary
+
+## Objective
+    Through this report, we will investigating our San Francisco's municipal employees' retirement fund (MERS). Currently, our client us utilizing a traditional $60/40$ allocation approach with $60$% on U.S. large-cap equities and $40$% on a fixed income blend. We have looked into unusual losses in $2022$ and unusual volatility from $2023-2024$. 
+
+## Key Findings:
+-  The MERS fund experienced extremely rare losses in $2022$. As that year our MERS fund had $15$% or more in annual losses. Which indicate a significant market downturn or crisis. As well as threaten short-term liquidity and long-term solvency. Which could cause us to not be able to make future payment obligations to our pension holders. 
+-  High prolonged volatility from $2023-2024$ most likely due to investors uncertain about the significant market downturns at that time. 
+-  Utilizing our AIRG Economic Scenario Generator we found that a $60/40$ investment strategy experiences $15$% or more in annual losses extremely rarely. As it is estimated to have a $1.51$% chance of it happening. With this into consideration we find that this is a pretty optimistic but realistic estimate. As events that yield $15$% losses annually are extremely rare throughout history.
+
+    To address the risk of not being able to make future payment obligations, the report will first look into the appropriate allocation strategy for our MERS fund with a current valuation of \$$525$ million. It should also be noted that our clients were wondering if utilizing a portion of their COVID relief funds would be a good idea.
+
+## Key Recommendation
+    Utilizing our AIRG ESG, the report will balance the MERS investment fund's insolvency risk, expected surplus, and Sharpe ratio performance over a $30$ year period. With these in mind, without the topup we suggest our client to use a $45/55$ allocation. Which provides our MERS fund the lowest insolvency rate, adequate $30$-year returns, and strong risk-adjusted performance. With this strategy it will provide us the best possible approach that has the highest chance of not failing in making future payment obligations. \
+    With the addition topup of \$$175$ million from San Francisco's COVID funds, the report will employ the same strategy of balancing insolvency risk, expected surplus, and Sharpe ratio. When observing the insolvency risk of all of our allocations have significantly decreased (near $0$% risk). Our new results of our allocations also produce significantly higher Sharpe ratios. Which indicate that we have greater risk-adjusted returns from all of our allocations. With all this being said, with the addition fund, we suggest a $30/70$ strategy. As it provides the highest risk-adjusted returns compared to the rest of the allocations. Though it is not a strategy that yields the lowest insolvency rate, it is extremely small ($0.3$%) that the reward out way the risk the $30/70$ receives. 
+
+    With these strategies will create an effective approach to the MER's long-term obligations to their retirees while not over contributing into the fund.
+
+
+
+
+\newpage
+
+# Introduction
+
+    As the newly appointed Managing Director at Ernst & Young, I was tasked with examining the recent investment challenges of our loyal client, the municipal employees' retirement fund (MERS) of San Francisco, California. This report with go through historical market performance, risk assessment, and long-term investment strategies. Before we begin with our analysis, it should be noted that MERS has been following a traditional $60/40$ investment approach. In which $60$% of their funds are invested in the United States' large cap equities and the other $40$% of their funds are invested in a blended fixed income fund designed to mimic a $65/35$ split between intermediate government and log-term corporate bonds.
+
+    With the fact that the MERS's fund experienced heavy losses in 2022 and significant market volatility in 2023 and 2024, we will be looking into the portfolio's performance from $2020$ to $2024$. Another objective of this report is to access the optimal portfolio allocation as well as observe the severity of losses throughout time relative to past market performances. With San Francisco thinking of utilizing an portion of their unspent COVID relief funds to bolster their MERS fund, we will examining what ways to better allocate our fund to give us the best results with an additional contribution of \$$175$ million.
+
+# Historical Perfermance Analysis
+
+```{r, include=FALSE}
+library(readxl)
+library(dplyr)
+library(zoo)
+library(ggplot2)
+file_path <- "~/Project 1 Historical Data.xlsx"
+
+df <- read_excel(file_path, sheet = "60-40 Returns Monthly", skip = 9)
+df=df[,-c(5,6,7)]
+df["Wealth Factor"] = cumprod(1 + df[4])
+colnames(df) <- c("Date", "Large_Cap", "Fixed", "Portfolio_Return", "Wealth_Factor")
+
+df$Date <- as.Date(df$Date)
+head(df)
+
+```
+
+```{r, include=FALSE}
+df <- df %>%
+  arrange(Date) %>%
+  mutate(Rolling_12M_Return = rollapply(1 + Portfolio_Return, width = 12,
+                                        FUN = function(x) prod(x) - 1,
+                                        fill = NA, align = "right"))
+df2 <- df %>%
+  arrange(Date) %>%
+  mutate(Rolling_12M_Return = rollapply(1 + Portfolio_Return, width = 12,
+                                        FUN = function(x) prod(x) - 1,
+                                        fill = NA, align = "right")) %>%
+  filter(Date >= as.Date("2020-01-01") & Date <= as.Date("2025-12-31"))
+tail(df)
+```
+
+    With the historical data that we have received we will first examine the heavy losses that the MERS's fund had experienced. To accomplish this we will observe the monthly portfolio returns from $2020$-$2024$. To help us examine the points at which the MERS's fund experienced heavy losses.
+
+```{r, echo=FALSE, fig.height=2.75, fig.width=5,fig.align="center"}
+ggplot(df2, aes(x = Date, y = Portfolio_Return)) +
+  geom_line(size=0.3, color = "steelblue") +
+  geom_hline(yintercept = 0, linetype = "dotted", color = "gray50")+
+  geom_hline(yintercept = -0.15/12, linetype = "dashed", color = "red", alpha = 0.7) +
+    annotate("text", x = max(df2$Date), y = -0.15/12, label = "15% Annual Loss", 
+           color = "red", hjust = 1, vjust = -0.5, size = 3) +
+  labs(title = "MERS Fund Monthly Returns (2020-2024)",
+       x = "Year", y = "Monthly Return") +
+  theme_minimal()
+```
+
+    While observing our plot, we notice that in $2022$ the MERS's fund experienced significant losses at to points throughout that year. One a little before the July $1$st and another after. With the second wave being a little more significant. We can also see that in $2020$, our fund experienced losses as well. While observing our monthly portfolio returns in $2022$, we can see frequent changes in investment performances from month to month in $2022$. Which indicates high volatility in $2022$. Telling us that there must have been lots of uncertainty and fear in the markets at that time. This uncertainty and fear could have been due to the surging inflation rates from $2021$ to $2023$. This is due to prices of goods increasing in price too rapidly, businesses/companies spending too much, falling unemployment, and labor shortages. Which eventually led to the United States Federal Reserves increasing interest rates significantly. With this development, the MERS fund could have experienced unusual losses in $2022$ as:
+
+1.  It made future earnings worth less than their present value leading to the valuation of companies and bond prices to fall significantly(i.e. increased equity risk).
+2.  Making investors fell more attracted to investing in treasury/government bonds as they are seen as "risk-free".
+3.  Market uncertainty and fear of a recession
+
+    While looking at our monthly returns the losses in $2022$ are extremely unusual as we can notice that there are lots of down peaks of returns that go below the $15$% annual loss threshold. This line tells us how often the MERS fund might loss $15$% or more in a single year. If the the portfolio where to under this line for a year or more, the fund would have an annual loss that would exceed $15$%. It is difficult to see at what points the MERS's fund exceed $15$% losses. As the monthly returns graph gives us inaccurate results due to the fact that returns compound. To help with this issue, we will be examining at the MERS's historical $12$-month returns to help us observe how our investment performs over consistent $12$-month intervals. 
+
+```{r, echo=FALSE, fig.height=2.75, fig.width=5,fig.align="center"}
+ggplot(df, aes(x = Date, y = Rolling_12M_Return)) +
+  geom_line(color = "firebrick") +
+  geom_hline(yintercept = -0.15, linetype = "dashed", color = "steelblue") +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray")+
+    annotate("text", x = max(df2$Date), y = -0.15, label = "15% Annual Loss", 
+           color = "steelblue", hjust = 1, vjust = -0.5, size = 3) +
+  labs(title = "Historical Rolling 12-Month Returns",
+       x = "Year", y = "12-Month Returns") +
+  theme_minimal()
+```
+
+
+    Looking at our historical $12$-month rolling returns, we notice that we have five negative peaks that have reached $-0.15$. Evident by the light blue dashed lines. This tells us that the MERS's investment portfolio has a $15$% or more decline in the total portfolio values over the past $12$ months in those time periods. We can also observe that the MERS fund received the worst returns in the $1930$s followed by the best returns. To get a better picture of how our MERS investment has done from most recently, we will be observing our graph from $2020$ to $2024$.
+
+
+```{r, echo=FALSE, fig.height=2.75, fig.width=5,fig.align="center"}
+ggplot(df2, aes(x = Date, y = Rolling_12M_Return)) +
+  geom_line(color = "coral") +
+  geom_hline(yintercept = -0.15, linetype = "dashed", color = "steelblue") +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray")+
+      annotate("text", x = max(df2$Date), y = -0.15, label = "15% Annual Loss", 
+           color = "steelblue", hjust = 1, vjust = -0.5, size = 3) +
+  labs(title = "Rolling 12-Month Returns (2020-2024)",
+       x = "Year", y = "12-Month Returns") +
+  theme_minimal()
+```
+
+    When observing our rolling returns from $2020$ to $2024$, we can see how $2022$ was a horrible year for the MERS fund. As we see that our line goes below the gray dashed line. Which indicate that our investment had a negative cumulative returns over a $12$-month rolling period from around the middle of $2022$ to the first half of $2023$. We can also notice that our line goes below our dashed light blue line. Implying that at a point in the beginning second half of $2022$ and in the beginning of $2023$, the MERS's investment portfolio has a $15$% or more decline in the total portfolio values over the past $12$ months in those periods of time. We can also notice that the MERS's fund got its positive returns over the past $12$ months in the middle of the first half of $2021$ and the middle of the last half of $2024$. What makes this extremely unusual is the fact that it is extremely rare to experience annual losses that are $15$% or more. As these would indicate horrible economic events (i.e. the Great Depression, $2008$ Financial Crisis, etc.). It should be noted that $15$% are extremely alarming as they threaten short term liquidity and long-term solvency. In the case of our MERS fund it will hinder our ability to meet future payment obligations as well as indicate that we will need to utilize a different portfolio allocation strategy. 
+
+    To learn more about the historical and recent $12$-month rolling returns of MERS's investment fund, we will look into valuable statistics produced using R-code.
+
+```{r table-chunk, echo=FALSE,results='asis'}
+rolling_returns <- df$Rolling_12M_Return[!is.na(df$Rolling_12M_Return)]
+rolling_returns_20_24 <- df2$Rolling_12M_Return[!is.na(df$Rolling_12M_Return)]
+summary_stats_df <- data.frame(
+  Metrics = c(
+    "Average Annual Return",
+    "Volatility", 
+    "Best 12-Month Return",
+    "Worst 12-Month Return",
+    "95% VaR",
+    "99% VaR"
+  ),
+  Historical = c(
+    paste0(round(mean(rolling_returns,na.rm=TRUE) * 100, 2), "%"),
+    paste0(round(sd(rolling_returns,na.rm=TRUE) * 100, 2), "%"),
+    paste0(round(max(rolling_returns,na.rm=TRUE) * 100, 2), "%"),
+    paste0(round(min(rolling_returns,na.rm=TRUE) * 100, 2), "%"),
+    paste0(round(quantile(rolling_returns,0.05,na.rm=TRUE) * 100, 2), "%"),
+    paste0(round(quantile(rolling_returns,0.01,na.rm=TRUE) * 100, 2), "%")
+  ),
+  Recent_Returns = c(
+    paste0(round(mean(rolling_returns_20_24,na.rm=TRUE) * 100, 2), "%"),
+    paste0(round(sd(rolling_returns_20_24,na.rm=TRUE) * 100, 2), "%"),
+    paste0(round(max(rolling_returns_20_24,na.rm=TRUE) * 100, 2), "%"),
+    paste0(round(min(rolling_returns_20_24,na.rm=TRUE) * 100, 2), "%"),
+    paste0(round(quantile(rolling_returns_20_24,0.05,na.rm=TRUE) * 100, 2), "%"),
+    paste0(round(quantile(rolling_returns_20_24,0.01,na.rm=TRUE) * 100, 2), "%")
+    )
+)
+names(summary_stats_df)[3]="2020-2024"
+library(knitr)
+library(kableExtra)
+
+knitr::kable(summary_stats_df, 
+             caption = "MERS Fund 12-Month Rolling Returns Statistics")
+
+```
+    What the percentages in our table tell us the percentage of investment growth or decline over a $12$-month time period. On Table $1$, we notice we have two metrics $95$% VaR and $99$% VaR. These variables tell us the percentage of time, where the portfolio will not lose more than a certain return. In Table $1$, we have that our historical $95$% VaR is $-11.2$%. Which indicate that $95$% of years, the MERS's fund will not lose more $11.2$%. In our recent ($2020$ to $2024$) $12$-month rolling returns statistics, we have a $95$% VaR of $-14.3$%. Telling us that $5$% of the time from $2020$ to $2024$, we would experience around $14.3$% or more losses. What makes this interesting is that we only experience negative returns in $2022$ and the beginning of $2023$. 
+
+
+    During times of large uncertainty and fear, markets tend to move a lot. Which causes large investment risks. We will now be looking at historical volatility to help our client's know the losses/gains to expect.
+
+
+```{r,echo=FALSE, fig.height=2.75, fig.width=5,fig.align="center"}
+df$Rolling_12M_StdDev <- rollapply(
+  df$Portfolio_Return, 
+  width = 12, 
+  FUN = sd, 
+  fill = NA, 
+  align = "right"
+)
+average_volatility <- mean(df$Rolling_12M_StdDev, na.rm = TRUE)
+
+ggplot(df, aes(x = Date)) +
+  geom_line(aes(y = Rolling_12M_StdDev), color = "red") +
+  geom_hline(yintercept = average_volatility, linetype = "dashed", color = "steelblue")+
+  labs(title = "MERS's Portfolio 12-Month Rolling Volatility",
+       x="Year",
+       y = "Monthly 12-Month Rolling Volatility")+
+  theme_minimal()
+```
+
+    While looking into our historical volatility, we notice that the MERS's fund experience its highest volatility in the $1930$s. We can observe that the peaks of rolling volatility gradually get smaller over time. This indicate that investors are more confident in their abilities to understand the market as time goes by. We can also note that the concept of mean reversion is in play as our rolling volatility tends to move back to the baseline volatility. Which is the mean volatility of approximately $2.908$%. As time goes by investors gain more knowledge and tools to understand the market. With this it is better look at recent rolling volatility activities to better access future investment risks.
+
+```{r,echo=FALSE, fig.height=2.75, fig.width=5,fig.align="center"}
+df_filtered=df%>%
+  filter(Date >= as.Date("2020-01-01"))
+ggplot(df_filtered, aes(x = Date)) +
+  geom_line(aes(y = Rolling_12M_StdDev), color = "darkmagenta") +
+    scale_x_date(limits = c(as.Date("2020-01-01"), max(df$Date))) +
+  geom_hline(yintercept = average_volatility, linetype = "dashed", color = "steelblue")+
+   annotate("text", x = max(df2$Date), y =average_volatility, label = "Avg. Volatility", 
+           color = "steelblue", hjust = 1, vjust = -0.5, size = 3) +
+  labs(title = "MERS's Portfolio 12-Month Rolling Volatility (2020-2024)",
+       x="Year",
+       y = "Monthly 12-Month Rolling Volatility")+
+  theme_minimal()
+```
+    From what we observe in the rolling volatility of the MERS investment, we do see something unusual regarding the volatility from $2023$ to $2024$. This is because we notice that our volatility gradually decreases and goes below the mean reversion baseline by the later half of $2024$. This indicates that their is a lingering/prolonged elevated volatility during that time period. Which means that markets were persistently uncertain. What is unusual is that normally the market stabilizes or would decrease in volatility to the historical average sooner. This prolonged period of volatility tell us that investors are extremely cautious of the market at the time. Which can be an indicator that many investor are predicting that something huge would happen that would affect the economy.
+
+
+
+# Portfolio Loss Probability Analysis
+    To better assess the MERS portfolio risks, we will be conducting analysis on the probability of portfolio loss. By utilizing the AIRG Economic Scenario Generator (ESG), it will help us better assess the risks the MERS fund is likely to experience horrible losses. 
+```{r,echo=FALSE}
+file_path <- "AIRG ASG.xlsx"
+us_raw <- read_excel(file_path, sheet = "US",col_names=FALSE)
+fixed_raw <- read_excel(file_path, sheet = "FIXED",col_names=FALSE)
+
+us_returns <- as.data.frame(
+  sapply(1:(ncol(us_raw) - 1), function(i) {
+    (us_raw[[i + 1]] / us_raw[[i]]) - 1
+  })
+)
+fixed_returns <- as.data.frame(
+  sapply(1:(ncol(fixed_raw) - 1), function(i) {
+    (fixed_raw[[i + 1]] / fixed_raw[[i]]) - 1
+  })
+)
+# Name the return columns after the corresponding Excel columns (e.g. B, C, ...)
+colnames(us_returns) <- colnames(us_raw)[-1]
+colnames(fixed_returns) <- colnames(fixed_returns)[-1]
+
+equity_weight <- 0.60
+fixed_weight <- 0.40
+weighted_returns <- equity_weight * as.matrix(us_returns) + fixed_weight * as.matrix(fixed_returns)
+returns_vec <- as.vector(weighted_returns)
+loss_thresholds <- c(0.05, 0.10, 0.15, 0.20, 0.25)
+
+# Calculate probabilities for losses greater than or equal to each threshold
+prob_losses <- sapply(loss_thresholds, function(thresh) {
+  mean(returns_vec <= -thresh)
+})
+
+# Create a summary table
+loss_summary <- data.frame(
+  Loss_Threshold = paste0(loss_thresholds * 100, "%"),
+  Probability = paste0(round(prob_losses * 100, 2),"%")
+)
+names(loss_summary)[1]="Loss Threshold"
+knitr::kable(loss_summary, 
+             caption = "% Loss Probabilities Over a Year Period of Similar Investment Portfolio")
+```
+    Based on the table above, we notice that our ESG produced a $1.51$% chance of experiencing extreme losses (i.e. $15$% or more). This low probability makes sense as there are not many periods of times where markets have experience extreme losses (i.e. the great depression in $1931$, the financial crisis in $2008$, and Federal Reserves increasing interest rates significantly in $2022$). It should also be noted that both the MERS and ESG are using a $60/40$ allocation strategy. Now, is this probability estimate realistic?
+
+    Though the ESG have the same portfolio allocations as the MERS, it does not mean the probability is realistic as there not the same. Only, similar! To help us better assess this we will be observing a historical estimate from the MERS historical data as well as a Monte Carlo with t-distribution probability losses. For our MERS fund estimate we will be utilizing the MERS portfolio $12$-month returns to find our extreme likelihood. This would provide us with a more precise loss probability estimate as it accounts real-world extreme losses better. For our Monte Carlo Simulation, we will be simulating $10000$ possible paths of returns using a t-distribution though R-code. Which will utilize the historical mean and standard deviation of the MERS portfolio $12$ month rolling returns to help simulate the process. 
+
+```{r,echo=FALSE}
+empirical_prob_15_loss <- mean(df$Rolling_12M_Return <= -0.15, na.rm = TRUE)
+set.seed(42)  # For reproducibility
+
+# Extract historical parameters
+mu_monthly <- mean(df$Portfolio_Return, na.rm = TRUE)
+sigma_monthly <- sd(df$Portfolio_Return, na.rm = TRUE)
+
+# Annualized parameters
+mu_annual <- 12 * mu_monthly
+sigma_annual <- sqrt(12) * sigma_monthly
+
+n_scenarios <- 10000
+annual_returns_normal <- rnorm(n_scenarios, mu_annual, sigma_annual)
+
+# Calculate probability of 15%+ loss
+prob_15_loss_normal <- mean(annual_returns_normal <= -0.15)
+
+
+equity_weight <- 0.60
+fixed_weight <- 0.40
+weighted_returns <- equity_weight * as.matrix(us_returns) + fixed_weight * as.matrix(fixed_returns)
+returns_vec <- as.vector(weighted_returns)
+m=mean(returns_vec <= -0.15)
+
+
+results_table <- data.frame(
+  Method = c("ESG","MERS", "Monte Carlo"),
+  `15%+ Loss Probability` = paste0(round(c(m*100,empirical_prob_15_loss*100, prob_15_loss_normal*100),2),"%")
+)
+names(results_table)[2]= "Probability"
+knitr::kable(results_table, 
+             caption = "15%+ Losses in Return")
+```
+    With the following probabilities we gain from both methods we introduced, we notice that the chances are greater than our AIRG ESG estimate. We can see that out Monte Carlo estimate if in the middle of both estimates as it assumes moderate extreme portfolio risk. Though the ESG provides the smallest estimate, the results that we got from the ESG is realistic. As it demonstrates a more optimistic view of the market. Which causes it to underestimate some of a little less extreme events. Another factor that we could consider our ESG estimate to be reasonable is due to that fact that a probability difference between the MERS and ESG is not that large of a gap. Usually, the difference in extremely small probability estimates are not really significant. 
+
+
+# Portfolio Recommendation at Current Investment Valuation
+
+    With a current investment valuation of \$$525$ million, it would be wise to find an portfolio allocation approach that could balance two major future risks. Which is the risk of being too conservative. Leading to adverse effects on retirees as funds will gradually not grow enough and portfolios will run out of money. The other risk is being too aggressive. Causing the portfolio to grow way more money that is needed. Which could be spent on improving San Francisco. 
+
+    For this we will be utilizing our AIRG ESG to simulate $1000$ paths on possible returns from various portfolio allocations over a $30$ year period. With this data, we will able to make the most optimal allocation approach for MRES fund. Where we do not have a massive surplus and be able to pay our retirees over $30$ years. 
+```{r,echo=FALSE,fig.width=12,include=FALSE}
+end_balance=read_excel("~/Allocation Data.xlsx")
+allocations = end_balance[ , -1] 
+x=c(0.27,0.255,0.235,0.23,0.225,0.227,0.222,0.219,0.223,0.229,0.253,0.311,0.402)
+summary_stats <- data.frame(
+  Allocation = c("100/0","90/10","80/20","70/30", "60/40", "55/45", "50/50", "45/55", "40/60", "30/70","20/80","10/90","0/100"),
+  Mean = colMeans(allocations),
+  SD = apply(allocations, 2, sd),
+  Paths_Fully_Funded=paste0((1-x)*100,"%"),
+  Insolvency_risk=paste0(x*100,"%")
+)
+
+names(summary_stats)[1]="Portfolio Allocation"
+names(summary_stats)[2]="Avg. Ending Surplus"
+names(summary_stats)[3]="Standard Deviation of Ending Surplus"
+names(summary_stats)[4]="% Paths Fully Funded"
+names(summary_stats)[5]="Insolvency Risk"
+summary_stats$Efficiency=round(summary_stats$`Avg. Ending Surplus`/summary_stats$`Standard Deviation of Ending Surplus`,4)
+names(summary_stats)[6]="Sharpe Ratio"
+```
+
+
+
+
+
+```{r,echo=FALSE, fig.height=4.2, fig.width=5,fig.align="center"}
+ggplot(summary_stats, aes(x = summary_stats$`Avg. Ending Surplus`, y = summary_stats$`Insolvency Risk`, label = summary_stats$`Portfolio Allocation`)) +
+  geom_point() +
+  geom_text(vjust = -0.5) +
+  labs(title = "Surplus vs. Insolvency Risk", x = "Average Ending Surplus", y = "Insolvency Risk")+
+  theme_minimal()
+```
+
+    When choosing the most optimal allocation portfolio, we must account for the probability of our portfolio will go under/loss money or insolvent. When comparing insolvency risks against average ending surplus of various allocations, we can notice that a $45/55$ allocation provides us the lowest insolvency risks over a $30$ year period. When selecting our allocations it would be best to remove allocations allocations with high insolvency risks. As we are dealing with a pension investment fund, where we should take into consideration that we want to be able to make annual payments to our retirees over a $30$ year period. In that we should not consider the following allocations: $0/100$, $10/90$, $20/80$, $30/70$, $70/30$, $80/20$, $90/10$, and $100/0$. Although, we do see that a $45/55$ portfolio yields the lowest insolvency risk and seems like the best allocation, we would like to be confidence regarding our choices. As the differences in insolvency rates between the allocations with the lowest rates are in too large. To become more confident in this choice we will looking into the Sharp ratio to help us evaluate our expected investment allocation returns over a $30$ year period relative to its risk.
+
+```{r,echo=FALSE}
+summary_stats=summary_stats[-c(1,2,3,4,10,11,12,13),]
+summary_stats=summary_stats[,-4]
+knitr::kable(summary_stats, row.names = FALSE,
+             caption = "Allocation 30 Year Pension Balance Statistics",
+              format = "markdown",align="c")
+```
+
+    By utilizing R-code to find our Sharpe Ratios of our allocations that have the lowest insolvency risk, we can see that we have two significant allocations that have the largest and quiet similar ratios. Which are our projected $50/50$ and $45/55$ allocations. With a higher Sharpe Ratio compared to other investment splits, this indicates that the investment is generating better returns for the amount of risk the fund is under. Now to chose the optimal portfolio allocation for our MERS fund. As a pension fund, we should select a investment approach that is conservative enough. Where it does not assume a lot of risk so that we are able to pay our retirees in our fund. As well as not assume an excessive surplus over a $30$ year period as we could spent the funds on municipal projects. Though a $50/50$ has a higher Sharpe ratio, the difference in ratios from the $50/50$ and $45/55$ splits are barely apart from each other. As mentioned before, we have that a $45/55$ split provides the lowest insolvency rate. Since we are also considering that we do not want to have a large surplus, we will ultimately get that a $45/55$ allocation would be the most perfered allocation for our MERS fund over $30$ years. 
+
+
+# Portfolio Recommendation with a $175 Million Top-up
+
+    With the consideration of utilizing a portion of San Francisco's COVID relief funds, worth \$$175$ million, to bolster the MERS fund, we must identify if this additional top-up is beneficial for us. As we are not in it to make money, rather to be able to make money to make our annual pension payments. With this in mind, we will be utilizing the same approach we did previously. In looking into the insolvency risk of each allocation with data produced by our AIRG ESG.
+
+```{r,echo=FALSE}
+new_balance=read_excel("~/Topup Allocation Data.xlsx")
+allocations = new_balance[ , -1] 
+x=c(0.093,0.068,0.05,0.037,0.021,0.014,0.011,0.007,0.006,0.003,0.0,0.001,0.001)
+summary_stats <- data.frame(
+  Allocation = c("100/0","90/10","80/20","70/30", "60/40", "55/45", "50/50", "45/55", "40/60", "30/70","20/80","10/90","0/100"),
+  Mean = colMeans(allocations),
+  SD = apply(allocations, 2, sd),
+  Paths_Fully_Funded=paste0((1-x)*100,"%"),
+  Insolvency_risk=paste0(x*100,"%")
+)
+
+names(summary_stats)[1]="Portfolio Allocation"
+names(summary_stats)[2]="Avg. Ending Surplus"
+names(summary_stats)[3]="Standard Deviation of Ending Surplus"
+names(summary_stats)[4]="% Paths Fully Funded"
+names(summary_stats)[5]="Insolvency Risk"
+summary_stats$Efficiency=round(summary_stats$`Avg. Ending Surplus`/summary_stats$`Standard Deviation of Ending Surplus`,4)
+names(summary_stats)[6]="Sharpe Ratio"
+```
+```{r,echo=FALSE, fig.height=4, fig.width=5,fig.align="center"}
+library(ggrepel)
+new_stats=read_excel("~/Topup Allocation Stats.xlsx")
+ggplot(new_stats, aes(x = `Avg. Ending Surplus`, y = `Insolvency Risk`)) +
+  geom_point() +
+  geom_text_repel(aes(label = `Portfolio Allocation`), max.overlaps = 100) +
+  labs(
+    title = "Surplus vs. Insolvency Risk With $175 Million",
+    x = "Average Ending Surplus",
+    y = "Insolvency Risk"
+  ) +
+  theme_minimal()
+```
+
+    While observing our insolvency risk for each of our allocations, we notice that the addition of the \$$175$ million topup helps in reducing our insolvency risk quiet significantly. As without the topup, we notice that the lowest insolvency rate we could have received was $21.9$%. Which is way higher than compared to all the allocations we have with the topup (as shown above). 
+    Now, the question arises. What allocation should we consider with the addition of the topup? To make this decision we will focus on allocations that have insolvency risks lower than $1$%. As we need to keep in mind that the addition of \$$175$ million could be spent on other projects that can be used to improve the city. 
+
+
+```{r,echo=FALSE}
+summary_stats=summary_stats[-c(1,2,3,4,5,6),]
+knitr::kable(summary_stats, row.names = FALSE,
+             caption = "Allocation 30 Year Pension Balance Statistics With Top-Up of $175 Million",
+              format = "markdown",align="c")
+```
+
+
+    When looking in-depth on the statistics of our portfolio allocations, We can clearly see that the addition COVID fund makes it much safer for us to invest. We can observe that it provides us with significantly higher risk-adjusted returns. We can also notice that when we apply a $20/80$ asset allocation we get $0$% insolvency risk. Though, it has a $0$% insolvency risk, we must keep in mind that these are simulated results. We should expect to have some situations that lose money in $30$ years. When investing we must also account if the risk we are willing to assume is worth it. Based on the Sharpe Ratio, we get that a $30/70$ allocation, provides us with the best risk-adjusted returns. With that in mind, a $30/70$ portfolio allocation will yield the most optimal results. As although a $20/80$ allocation provides a $0$% insolvency rate, the risk of not being able to make our monthly payments assumed from a $30/70$ is so minimal that our risk-adjusted returns make us prefer this allocation compared to a $20/80$. As the difference in sharpie ratios between a $30/70$ and $20/80$ are significant enough for us to want a $30/70$. Hence, I would suggest a $30/70$ allocation as the risk is worth the reward.
+
+
+
+
+
+
+# Conclusion
+    Throughout our whole process, we were able to obtain that the losses in our $2022$ and volatility from $2023-2024$ were indeed unusual. As in $2022$ our MERS fund has experienced significant losses. Where the losses have reached $15$% or more in annual losses. Which indicate that there has been a horrific event that has occurred in the the markets at that time. As most more than half of our allocations are in to U.S. Large Caps. With the fact that the chances of $15$% annual losses is extremely rare. We can get that the unusual prolonged high volatility from $2023-24$ must have stem from lots of investors being extremely uncertain and fearful of the markets after the horrific declines in the market. With the fact that the MERS fund has a pension valued at \$$525$ million. Through data from our AIRG ESG in a $30$ year period, we have concluded that a $45/55$ investment allocation would best suit our MERS fund in the future. As it provided the lowest risk of insolvency as well as provided us with one of the highest risk-adjusted returns compared to other asset allocations. We have also found that with the additional portion of the COVID relief fund being put into our MERS fund would significantly improve our investment outcomes. Making every allocation less risky to invest in. We were also able to come up with an optimal allocation of $30/70$ as although there is some risk involved it is so minimal that we are kind of not really worried about the risk of not being able make the pension payments through out $30$ years. As the $30/70$ allocation provides us with returns that are far better compared to other allocations. 
+
+
+
+
+
+
+
+
+
+
